@@ -1,0 +1,63 @@
+{
+  "7027663241": {
+    "vip": false,
+    "favorites": [
+      "XLMUSDT"
+    ],
+    "alerts": {},
+    "last_coin": "XLMUSDT",
+    "auto": false,
+    "interval": 0,
+    "last_signal": 0,
+    "invoice_id": null,
+    "invoice_url": null,
+    "invoice_hash": null,
+    "lang": "ua",
+    "awaiting_alert": false
+  },
+  "1609966483": {
+    "vip": false,
+    "favorites": [],
+    "alerts": {},
+    "last_coin": "AVAXUSDT",
+    "auto": false,
+    "interval": 0,
+    "last_signal": 0,
+    "invoice_id": null,
+    "invoice_url": null,
+    "invoice_hash": null,
+    "lang": "ua",
+    "awaiting_alert": false,
+    "last_timeframe": "15m",
+    "history": [
+      {
+        "symbol": "AVAXUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": -10,
+        "ts": 1776798237
+      },
+      {
+        "symbol": "BTCUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": -10,
+        "ts": 1776798022
+      },
+      {
+        "symbol": "BTCUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": -10,
+        "ts": 1776798016
+      },
+      {
+        "symbol": "BTCUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": -10,
+        "ts": 1776798000
+      }
+    ]
+  }
+}
