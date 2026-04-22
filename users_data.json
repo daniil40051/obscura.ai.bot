@@ -13,7 +13,10 @@
     "invoice_url": null,
     "invoice_hash": null,
     "lang": "ua",
-    "awaiting_alert": false
+    "awaiting_alert": false,
+    "vip_until": 0,
+    "last_timeframe": "15m",
+    "history": []
   },
   "1609966483": {
     "vip": false,
@@ -58,6 +61,7 @@
         "strength": -10,
         "ts": 1776798000
       }
-    ]
+    ],
+    "vip_until": 0
   }
 }
