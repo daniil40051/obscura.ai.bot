@@ -13,6 +13,7 @@ VIP_PRICE_USDT = 3
 VIP_WEEK_STARS = 100
 TRIAL_VIP_DAYS = 1
 BINANCE = "https://api.binance.com/api/v3"
+BYBIT = "https://api.bybit.com/v5/market"
 CRYPTO_API = "https://pay.crypt.bot/api"
 CHANNEL_ID = 0  # Наприклад: -1001234567890
 DAILY_DIGEST_HOUR_UTC = 9
@@ -429,10 +430,38 @@ def get_invoice_status(invoice_id):
 
 def klines(symbol, interval="15m", limit=120):
     data = api_get_json(f"{BINANCE}/klines?symbol={symbol}&interval={interval}&limit={limit}")
-    if not data or not isinstance(data, list):
+    if data and isinstance(data, list):
+        try:
+            return [float(item[4]) for item in data]
+        except Exception:
+            pass
+    return bybit_klines(symbol, interval=interval, limit=limit)
+
+
+def bybit_symbol(symbol):
+    return symbol
+
+
+def bybit_interval(interval):
+    mapping = {
+        "15m": "15",
+        "1h": "60",
+        "4h": "240",
+    }
+    return mapping.get(interval, "15")
+
+
+def bybit_klines(symbol, interval="15m", limit=120):
+    data = api_get_json(
+        f"{BYBIT}/kline?category=linear&symbol={bybit_symbol(symbol)}&interval={bybit_interval(interval)}&limit={limit}"
+    )
+    rows = (((data or {}).get("result") or {}).get("list") or [])
+    if not rows:
         return []
     try:
-        return [float(item[4]) for item in data]
+        closes = [float(item[4]) for item in rows]
+        closes.reverse()
+        return closes
     except Exception:
         return []
 
@@ -442,19 +471,37 @@ def get_price(symbol):
     try:
         return float(data["price"])
     except Exception:
-        return 0.0
+        bybit_data = api_get_json(f"{BYBIT}/tickers?category=linear&symbol={bybit_symbol(symbol)}")
+        try:
+            return float((((bybit_data or {}).get("result") or {}).get("list") or [])[0]["lastPrice"])
+        except Exception:
+            return 0.0
 
 
 def ticker_24h(symbol):
     data = api_get_json(f"{BINANCE}/ticker/24hr?symbol={symbol}")
-    if not data:
+    if data:
+        try:
+            return {
+                "change_percent": float(data.get("priceChangePercent", 0)),
+                "high": float(data.get("highPrice", 0)),
+                "low": float(data.get("lowPrice", 0)),
+                "volume": float(data.get("quoteVolume", 0)),
+            }
+        except Exception:
+            pass
+
+    bybit_data = api_get_json(f"{BYBIT}/tickers?category=linear&symbol={bybit_symbol(symbol)}")
+    rows = (((bybit_data or {}).get("result") or {}).get("list") or [])
+    if not rows:
         return None
     try:
+        row = rows[0]
         return {
-            "change_percent": float(data.get("priceChangePercent", 0)),
-            "high": float(data.get("highPrice", 0)),
-            "low": float(data.get("lowPrice", 0)),
-            "volume": float(data.get("quoteVolume", 0)),
+            "change_percent": float(row.get("price24hPcnt", 0)) * 100,
+            "high": float(row.get("highPrice24h", 0)),
+            "low": float(row.get("lowPrice24h", 0)),
+            "volume": float(row.get("turnover24h", 0)),
         }
     except Exception:
         return None
@@ -462,16 +509,32 @@ def ticker_24h(symbol):
 
 def market_movers(limit=12):
     data = api_get_json(f"{BINANCE}/ticker/24hr")
-    if not data or not isinstance(data, list):
-        return []
     result = []
-    for item in data:
-        symbol = item.get("symbol", "")
+    if data and isinstance(data, list):
+        for item in data:
+            symbol = item.get("symbol", "")
+            if not symbol.endswith("USDT"):
+                continue
+            try:
+                change_percent = float(item.get("priceChangePercent", 0))
+                volume = float(item.get("quoteVolume", 0))
+            except Exception:
+                continue
+            if volume < 1_500_000:
+                continue
+            result.append({"symbol": symbol, "change_percent": change_percent, "volume": volume})
+        result.sort(key=lambda x: abs(x["change_percent"]), reverse=True)
+        return result[:limit]
+
+    bybit_data = api_get_json(f"{BYBIT}/tickers?category=linear")
+    rows = (((bybit_data or {}).get("result") or {}).get("list") or [])
+    for row in rows:
+        symbol = row.get("symbol", "")
         if not symbol.endswith("USDT"):
             continue
         try:
-            change_percent = float(item.get("priceChangePercent", 0))
-            volume = float(item.get("quoteVolume", 0))
+            change_percent = float(row.get("price24hPcnt", 0)) * 100
+            volume = float(row.get("turnover24h", 0))
         except Exception:
             continue
         if volume < 1_500_000:
