@@ -12,17 +12,34 @@
     "invoice_id": null,
     "invoice_url": null,
     "invoice_hash": null,
-    "lang": "ua",
+    "lang": "en",
     "awaiting_alert": false,
     "vip_until": 0,
     "last_timeframe": "15m",
-    "history": []
+    "history": [
+      {
+        "symbol": "XLMUSDT",
+        "timeframe": "15m",
+        "signal": "🟢 BUY",
+        "strength": 50,
+        "ts": 1776880276
+      },
+      {
+        "symbol": "XLMUSDT",
+        "timeframe": "15m",
+        "signal": "🟢 BUY",
+        "strength": 50,
+        "ts": 1776880269
+      }
+    ]
   },
   "1609966483": {
-    "vip": false,
-    "favorites": [],
+    "vip": true,
+    "favorites": [
+      "ETCUSDT"
+    ],
     "alerts": {},
-    "last_coin": "AVAXUSDT",
+    "last_coin": "TONUSDT",
     "auto": false,
     "interval": 0,
     "last_signal": 0,
@@ -33,6 +50,48 @@
     "awaiting_alert": false,
     "last_timeframe": "15m",
     "history": [
+      {
+        "symbol": "TONUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": -10,
+        "ts": 1776882458
+      },
+      {
+        "symbol": "ETCUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": -50,
+        "ts": 1776880332
+      },
+      {
+        "symbol": "ETCUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": -25,
+        "ts": 1776880090
+      },
+      {
+        "symbol": "ETCUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": -50,
+        "ts": 1776880083
+      },
+      {
+        "symbol": "ETCUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": -25,
+        "ts": 1776880060
+      },
+      {
+        "symbol": "BTCUSDT",
+        "timeframe": "15m",
+        "signal": "🟡 HOLD",
+        "strength": 10,
+        "ts": 1776879865
+      },
       {
         "symbol": "AVAXUSDT",
         "timeframe": "15m",

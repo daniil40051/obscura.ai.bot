@@ -7,12 +7,15 @@ import time
 import uuid
 import requests
 
-BOT_TOKEN = "8505375356:AAGknVv021Gnb5Akpz1kWwAjKuc3WgCmT2Y"
+BOT_TOKEN = "8505375356:AAGNS2y3wVhdeag50iqkThLkDabbi9XNcXU"
 CRYPTOBOT_TOKEN = "511784:AAU9aOOW193fC7UQkg3trqZdF0FyMfOeaR4"
 VIP_PRICE_USDT = 3
 VIP_WEEK_STARS = 100
+TRIAL_VIP_DAYS = 1
 BINANCE = "https://api.binance.com/api/v3"
 CRYPTO_API = "https://pay.crypt.bot/api"
+CHANNEL_ID = 0  # Наприклад: -1001234567890
+DAILY_DIGEST_HOUR_UTC = 9
 
 ADMIN_IDS = [1609966483]
 
@@ -128,6 +131,8 @@ MESSAGES = {
         "vip_created": "💳 Рахунок для VIP створено. Натисни кнопку нижче для оплати.",
         "stars_invoice_sent": "⭐ Інвойс на тижневий VIP через Stars відправлено.",
         "stars_week_activated": "⭐ VIP через Stars активовано на 7 днів.",
+        "trial_activated": "🎁 Пробний VIP активовано на 1 день.",
+        "trial_used": "⌛ Пробний VIP уже був використаний.",
         "invoice_wait": "⌛ Оплату ще не підтверджено. Якщо вже оплатив, перевір ще раз через кілька секунд.",
         "invoice_expired": "⌛ Рахунок більше неактивний. Створи новий.",
         "invoice_error": "❌ Не вдалося створити рахунок. Перевір CryptoBot токен.",
@@ -142,6 +147,9 @@ MESSAGES = {
         "scanner_title": "🧠 *VIP Scanner*",
         "history_empty": "📭 Історія сигналів поки порожня",
         "history_title": "🗂 *Останні сигнали*",
+        "history_stats": "Winrate: `{winrate}%` | Закрито: `{closed}` | Плюс: `{wins}` | Мінус: `{losses}`",
+        "digest_title": "📬 *VIP Daily Digest*",
+        "channel_post_sent": "📢 Пост у канал відправлено",
         "market_mood": "🌍 *Настрій ринку*",
         "trend_bull": "Бичачий",
         "trend_bear": "Ведмежий",
@@ -163,10 +171,12 @@ MESSAGES = {
             "VIP: `{vip}`\n"
             "Free: `{free}`\n"
             "Алертів: `{alerts}`\n"
-            "Обраних: `{favorites}`"
+            "Обраних: `{favorites}`\n"
+            "Trial users: `{trial}`"
         ),
         "vip_granted": "✅ VIP видано користувачу `{uid}`",
         "vip_revoked": "✅ VIP знято у користувача `{uid}`",
+        "coin_stats_title": "📊 *Статистика монети*",
     },
     "en": {
         "welcome": (
@@ -232,6 +242,8 @@ MESSAGES = {
         "vip_created": "💳 VIP invoice created. Tap the button below to pay.",
         "stars_invoice_sent": "⭐ Weekly VIP Stars invoice sent.",
         "stars_week_activated": "⭐ VIP via Stars activated for 7 days.",
+        "trial_activated": "🎁 Trial VIP activated for 1 day.",
+        "trial_used": "⌛ Trial VIP has already been used.",
         "invoice_wait": "⌛ Payment is not confirmed yet. If you already paid, check again in a few seconds.",
         "invoice_expired": "⌛ Invoice is no longer active. Create a new one.",
         "invoice_error": "❌ Could not create invoice. Check the CryptoBot token.",
@@ -246,6 +258,9 @@ MESSAGES = {
         "scanner_title": "🧠 *VIP Scanner*",
         "history_empty": "📭 Signal history is empty",
         "history_title": "🗂 *Recent signals*",
+        "history_stats": "Winrate: `{winrate}%` | Closed: `{closed}` | Wins: `{wins}` | Losses: `{losses}`",
+        "digest_title": "📬 *VIP Daily Digest*",
+        "channel_post_sent": "📢 Channel post sent",
         "market_mood": "🌍 *Market mood*",
         "trend_bull": "Bullish",
         "trend_bear": "Bearish",
@@ -267,10 +282,12 @@ MESSAGES = {
             "VIP: `{vip}`\n"
             "Free: `{free}`\n"
             "Alerts: `{alerts}`\n"
-            "Favorites: `{favorites}`"
+            "Favorites: `{favorites}`\n"
+            "Trial users: `{trial}`"
         ),
         "vip_granted": "✅ VIP granted to `{uid}`",
         "vip_revoked": "✅ VIP revoked for `{uid}`",
+        "coin_stats_title": "📊 *Coin stats*",
     },
 }
 
@@ -298,6 +315,7 @@ def get_user(uid):
         users[uid] = {
             "vip": False,
             "vip_until": 0,
+            "trial_used": False,
             "favorites": [],
             "alerts": {},
             "last_coin": None,
@@ -307,6 +325,7 @@ def get_user(uid):
             "last_signal": 0,
             "invoice_id": None,
             "invoice_url": None,
+            "last_digest_day": "",
             "lang": "ua",
             "awaiting_alert": False,
             "history": [],
@@ -315,6 +334,7 @@ def get_user(uid):
 
     user = users[uid]
     user.setdefault("vip_until", 0)
+    user.setdefault("trial_used", False)
     user.setdefault("favorites", [])
     user.setdefault("alerts", {})
     user.setdefault("last_coin", None)
@@ -324,6 +344,7 @@ def get_user(uid):
     user.setdefault("last_signal", 0)
     user.setdefault("invoice_id", None)
     user.setdefault("invoice_url", None)
+    user.setdefault("last_digest_day", "")
     user.setdefault("lang", "ua")
     user.setdefault("awaiting_alert", False)
     user.setdefault("history", [])
@@ -698,8 +719,10 @@ def main_menu(user=None):
         kb.add("🔔 Алерт", "🤖 Auto Signals")
         kb.add("🧠 VIP Сканер", "🗂 Історія")
         kb.add("📈 Top BUY", "📉 Top SELL")
+        kb.add("📬 Digest", "📊 Coin Stats")
     else:
-        kb.add("🤖 Auto Signals", "💎 VIP")
+        kb.add("🎁 Trial VIP", "💎 VIP")
+        kb.add("🤖 Auto Signals", "📣 Канал")
     kb.add("👤 Профіль", "🌐 Мова")
     return kb
 
@@ -711,6 +734,41 @@ def interval_label(seconds):
     return "30m"
 
 
+def trade_plan(signal_data):
+    entry = signal_data["current"]
+    support = signal_data["support"]
+    resistance = signal_data["resistance"]
+    if signal_data["signal"] == "🟢 BUY":
+        stop = support * 0.995 if support else entry * 0.985
+        take = resistance if resistance > entry else entry * 1.03
+    elif signal_data["signal"] == "🔴 SELL":
+        stop = resistance * 1.005 if resistance else entry * 1.015
+        take = support if support < entry else entry * 0.97
+    else:
+        stop = entry * 0.99
+        take = entry * 1.01
+    return {
+        "entry": entry,
+        "stop": stop,
+        "take": take,
+    }
+
+
+def coin_signal_snapshot(symbol, timeframe="15m"):
+    signal_data = calc_signal_data(symbol, interval=timeframe)
+    if not signal_data:
+        return None
+    ticker = ticker_24h(symbol) or {"change_percent": 0}
+    return {
+        "symbol": symbol,
+        "signal": signal_data["signal"],
+        "strength": signal_data["strength"],
+        "volatility": signal_data["volatility"],
+        "change": ticker["change_percent"],
+        "signal_data": signal_data,
+    }
+
+
 def build_report(uid, symbol, timeframe="15m"):
     user = get_user(uid)
     signal_data = calc_signal_data(symbol, interval=timeframe)
@@ -720,6 +778,7 @@ def build_report(uid, symbol, timeframe="15m"):
 
     if user["vip"]:
         title = msg(uid, "vip_report_title")
+        plan = trade_plan(signal_data)
         return (
             f"{title}\n"
             f"🪙 *{symbol}*  `{timeframe}`\n"
@@ -733,6 +792,7 @@ def build_report(uid, symbol, timeframe="15m"):
             f"🌪 {msg(uid, 'volatility_label')}: `{signal_data['volatility']}%`\n"
             f"💪 {msg(uid, 'strength_label')}: `{signal_data['strength']}`\n"
             f"⚠️ {msg(uid, 'risk_label')}: `{signal_data['risk']}`\n"
+            f"🎯 Entry / TP / SL: `{format_price(plan['entry'])}` / `{format_price(plan['take'])}` / `{format_price(plan['stop'])}`\n"
             f"🕒 24h: `{ticker['change_percent']:+.2f}%`\n"
             f"⬆️ High: `{format_price(ticker['high'])}`\n"
             f"⬇️ Low: `{format_price(ticker['low'])}`"
@@ -758,10 +818,55 @@ def save_signal_history(uid, symbol, timeframe, signal_data):
         "timeframe": timeframe,
         "signal": signal_data["signal"],
         "strength": signal_data["strength"],
+        "entry_price": signal_data["current"],
         "ts": int(time.time()),
+        "checked": False,
+        "result": None,
+        "result_percent": 0,
     })
     user["history"] = history[:20]
     save_users()
+
+
+def signal_result(entry_price, current_price, signal):
+    if not entry_price or not current_price:
+        return None, 0
+    change = ((current_price - entry_price) / entry_price) * 100
+    if signal == "🟢 BUY":
+        return ("win" if change > 0 else "loss"), round(change, 2)
+    if signal == "🔴 SELL":
+        inverted = -change
+        return ("win" if inverted > 0 else "loss"), round(inverted, 2)
+    return None, 0
+
+
+def update_signal_history_results(uid):
+    user = get_user(uid)
+    changed = False
+    now = int(time.time())
+    for item in user.get("history", []):
+        if item.get("checked"):
+            continue
+        if now - int(item.get("ts", 0)) < 3600:
+            continue
+        current_price = get_price(item["symbol"])
+        result, result_percent = signal_result(item.get("entry_price", 0), current_price, item.get("signal"))
+        item["checked"] = True
+        item["result"] = result
+        item["result_percent"] = result_percent
+        changed = True
+    if changed:
+        save_users()
+
+
+def history_stats(uid):
+    user = get_user(uid)
+    closed = [x for x in user.get("history", []) if x.get("result") in ("win", "loss")]
+    wins = sum(1 for x in closed if x.get("result") == "win")
+    losses = sum(1 for x in closed if x.get("result") == "loss")
+    total = len(closed)
+    winrate = round((wins / total) * 100, 1) if total else 0
+    return {"wins": wins, "losses": losses, "closed": total, "winrate": winrate}
 
 
 def make_chart(symbol, timeframe="15m"):
@@ -832,12 +937,28 @@ async def activate_vip(uid, days=None):
 
 def format_history(uid):
     user = get_user(uid)
+    update_signal_history_results(uid)
     if not user["history"]:
         return msg(uid, "history_empty")
-    lines = [msg(uid, "history_title"), ""]
+    stats = history_stats(uid)
+    lines = [
+        msg(uid, "history_title"),
+        msg(uid, "history_stats", winrate=stats["winrate"], closed=stats["closed"], wins=stats["wins"], losses=stats["losses"]),
+        "",
+    ]
     for item in user["history"][:10]:
+        result = item.get("result")
+        result_percent = item.get("result_percent", 0)
+        if result == "win":
+            suffix = f" | ✅ `{result_percent:+.2f}%`"
+        elif result == "loss":
+            suffix = f" | ❌ `{result_percent:+.2f}%`"
+        elif item.get("checked"):
+            suffix = " | ⚪ `0.00%`"
+        else:
+            suffix = " | ⏳ `pending`"
         lines.append(
-            f"`{item['symbol']}` {item['timeframe']} {item['signal']} | strength `{item['strength']}`"
+            f"`{item['symbol']}` {item['timeframe']} {item['signal']} | strength `{item['strength']}`{suffix}"
         )
     return "\n".join(lines)
 
@@ -907,12 +1028,60 @@ def run_directional_scanner(uid, direction="buy"):
     return "\n".join(lines)
 
 
+def coin_stats_report(uid):
+    user = get_user(uid)
+    stats = {}
+    for item in user.get("history", []):
+        symbol = item["symbol"]
+        stats.setdefault(symbol, {"wins": 0, "losses": 0, "count": 0})
+        if item.get("result") == "win":
+            stats[symbol]["wins"] += 1
+            stats[symbol]["count"] += 1
+        elif item.get("result") == "loss":
+            stats[symbol]["losses"] += 1
+            stats[symbol]["count"] += 1
+    if not stats:
+        return msg(uid, "history_empty")
+    ranked = sorted(
+        stats.items(),
+        key=lambda x: ((x[1]["wins"] / x[1]["count"]) if x[1]["count"] else 0, x[1]["count"]),
+        reverse=True,
+    )
+    lines = [msg(uid, "coin_stats_title"), ""]
+    for symbol, data in ranked[:8]:
+        winrate = round((data["wins"] / data["count"]) * 100, 1) if data["count"] else 0
+        lines.append(f"`{symbol}` | winrate `{winrate}%` | wins `{data['wins']}` | losses `{data['losses']}`")
+    return "\n".join(lines)
+
+
+def build_daily_digest(uid):
+    mood = market_mood()
+    picks = []
+    for symbol in VIP_COINS:
+        snap = coin_signal_snapshot(symbol, timeframe="15m")
+        if not snap or snap["signal"] == "🟡 HOLD":
+            continue
+        picks.append(snap)
+    picks.sort(key=lambda x: abs(x["strength"]), reverse=True)
+    lines = [msg(uid, "digest_title"), ""]
+    if mood:
+        trend_key = {"bull": "trend_bull", "bear": "trend_bear", "flat": "trend_flat"}[mood["trend"]]
+        lines.append(f"🌍 Trend: *{msg(uid, trend_key)}* | Avg 24h `{mood['avg']:+.2f}%`")
+        lines.append("")
+    for item in picks[:5]:
+        lines.append(
+            f"{item['signal']} `{item['symbol']}` | power `{item['strength']}` | 24h `{item['change']:+.2f}%`"
+        )
+    return "\n".join(lines)
+
+
 def get_admin_stats(uid):
     total_users = len(users)
-    vip_users = sum(1 for user in users.values() if user.get("vip"))
+    vip_users = sum(1 for user_id in users.keys() if user_is_vip(user_id))
     free_users = total_users - vip_users
     total_alerts = sum(len(user.get("alerts", {})) for user in users.values())
     total_favorites = sum(len(user.get("favorites", [])) for user in users.values())
+    trial_users = sum(1 for user in users.values() if user.get("trial_used"))
     return msg(
         uid,
         "admin_stats",
@@ -921,6 +1090,7 @@ def get_admin_stats(uid):
         free=free_users,
         alerts=total_alerts,
         favorites=total_favorites,
+        trial=trial_users,
     )
 
 
@@ -928,6 +1098,21 @@ def get_admin_stats(uid):
 async def start(message: types.Message):
     user = get_user(message.from_user.id)
     await message.answer(msg(message.from_user.id, "welcome"), parse_mode="Markdown", reply_markup=main_menu(user))
+
+
+@dp.message_handler(lambda m: m.text == "🎁 Trial VIP")
+async def trial_vip_cmd(message: types.Message):
+    user = get_user(message.from_user.id)
+    if user_is_vip(message.from_user.id):
+        await message.answer(msg(message.from_user.id, "vip_already"))
+        return
+    if user.get("trial_used"):
+        await message.answer(msg(message.from_user.id, "trial_used"))
+        return
+    user["trial_used"] = True
+    save_users()
+    await activate_vip(message.from_user.id, days=TRIAL_VIP_DAYS)
+    await message.answer(msg(message.from_user.id, "trial_activated"))
 
 
 @dp.message_handler(commands=["vip_free"])
@@ -998,6 +1183,21 @@ async def broadcast_cmd(message: types.Message):
         except Exception:
             pass
     await message.answer(msg(message.from_user.id, "broadcast_done", sent=sent))
+
+
+@dp.message_handler(commands=["channel_post"])
+async def channel_post_cmd(message: types.Message):
+    if message.from_user.id not in ADMIN_IDS:
+        await message.answer(msg(message.from_user.id, "admin_only"))
+        return
+    if not CHANNEL_ID:
+        await message.answer("Спочатку задай CHANNEL_ID у коді.")
+        return
+    text = message.text.replace("/channel_post", "", 1).strip()
+    if not text:
+        text = build_daily_digest(message.from_user.id)
+    await bot.send_message(CHANNEL_ID, text, parse_mode="Markdown")
+    await message.answer(msg(message.from_user.id, "channel_post_sent"))
 
 
 @dp.message_handler(lambda m: m.text == "🌐 Мова")
@@ -1272,6 +1472,27 @@ async def top_sell_cmd(message: types.Message):
     await message.answer(run_directional_scanner(message.from_user.id, "sell"), parse_mode="Markdown")
 
 
+@dp.message_handler(lambda m: m.text == "📬 Digest")
+async def digest_cmd(message: types.Message):
+    if not user_is_vip(message.from_user.id):
+        await message.answer(msg(message.from_user.id, "only_vip"))
+        return
+    await message.answer(build_daily_digest(message.from_user.id), parse_mode="Markdown")
+
+
+@dp.message_handler(lambda m: m.text == "📊 Coin Stats")
+async def coin_stats_cmd(message: types.Message):
+    if not user_is_vip(message.from_user.id):
+        await message.answer(msg(message.from_user.id, "only_vip"))
+        return
+    await message.answer(coin_stats_report(message.from_user.id), parse_mode="Markdown")
+
+
+@dp.message_handler(lambda m: m.text == "📣 Канал")
+async def channel_hint_cmd(message: types.Message):
+    await message.answer("Telegram-канал дає довіру, органіку і продаж VIP. Далі я підготую тобі повну схему каналу та постів.")
+
+
 @dp.message_handler(lambda m: m.text == "🗂 Історія")
 async def history_cmd(message: types.Message):
     if not user_is_vip(message.from_user.id):
@@ -1374,6 +1595,8 @@ async def background_loop():
     while True:
         now = time.time()
         for uid, user in list(users.items()):
+            update_signal_history_results(uid)
+            today_key = time.strftime("%Y-%m-%d", time.gmtime(now))
             if user.get("invoice_id") and not user_is_vip(uid):
                 try:
                     invoice = get_invoice_status(user["invoice_id"])
@@ -1417,6 +1640,29 @@ async def background_loop():
                             pass
                     user["last_signal"] = now
                     save_users()
+
+            if user_is_vip(uid) and user.get("last_digest_day") != today_key:
+                current_hour = int(time.strftime("%H", time.gmtime(now)))
+                if current_hour >= DAILY_DIGEST_HOUR_UTC:
+                    try:
+                        await bot.send_message(uid, build_daily_digest(uid), parse_mode="Markdown")
+                    except Exception:
+                        pass
+                    user["last_digest_day"] = today_key
+                    save_users()
+
+        if CHANNEL_ID:
+            current_hour = int(time.strftime("%H", time.gmtime(now)))
+            today_key = time.strftime("%Y-%m-%d", time.gmtime(now))
+            admin_user = ADMIN_IDS[0] if ADMIN_IDS else 0
+            channel_state = users.setdefault(0, {"last_channel_digest_day": ""})
+            if current_hour >= DAILY_DIGEST_HOUR_UTC and channel_state.get("last_channel_digest_day") != today_key:
+                try:
+                    await bot.send_message(CHANNEL_ID, build_daily_digest(admin_user), parse_mode="Markdown")
+                except Exception:
+                    pass
+                channel_state["last_channel_digest_day"] = today_key
+                save_users()
         if users:
             save_users()
         await asyncio.sleep(30)
