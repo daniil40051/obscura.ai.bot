@@ -10,6 +10,7 @@ import requests
 BOT_TOKEN = "8505375356:AAGknVv021Gnb5Akpz1kWwAjKuc3WgCmT2Y"
 CRYPTOBOT_TOKEN = "511784:AAU9aOOW193fC7UQkg3trqZdF0FyMfOeaR4"
 VIP_PRICE_USDT = 3
+VIP_WEEK_STARS = 100
 BINANCE = "https://api.binance.com/api/v3"
 CRYPTO_API = "https://pay.crypt.bot/api"
 
@@ -34,8 +35,9 @@ dp = Dispatcher(bot)
 users = {}
 
 FREE_COINS = [
-    "BTCUSDT", "ETHUSDT", "TRXUSDT", "DOGEUSDT", "TONUSDT", "XRPUSDT", "ADAUSDT", "AVAXUSDT",
-    "LINKUSDT", "DOTUSDT", "SHIBUSDT", "BCHUSDT", "ATOMUSDT", "LTCUSDT", "NEARUSDT", "MATICUSDT"
+    "BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "TONUSDT", "DOGEUSDT", "TRXUSDT",
+    "ADAUSDT", "AVAXUSDT", "LINKUSDT", "DOTUSDT", "LTCUSDT", "BCHUSDT", "ATOMUSDT", "NEARUSDT",
+    "MATICUSDT", "SUIUSDT", "TIAUSDT", "UNIUSDT", "SHIBUSDT", "PEPEUSDT"
 ]
 
 VIP_COINS = [
@@ -44,11 +46,13 @@ VIP_COINS = [
     "ARBUSDT", "OPUSDT", "NEARUSDT", "INJUSDT", "FILUSDT", "SUIUSDT", "TIAUSDT", "SEIUSDT",
     "HBARUSDT", "UNIUSDT", "ETCUSDT", "AAVEUSDT", "ICPUSDT", "PEPEUSDT", "SHIBUSDT", "MKRUSDT",
     "RNDRUSDT", "GALAUSDT", "VETUSDT", "ALGOUSDT", "XLMUSDT", "IMXUSDT", "RUNEUSDT", "SANDUSDT",
-    "MANAUSDT", "AXSUSDT", "FLOWUSDT", "EOSUSDT", "XTZUSDT", "KAVAUSDT", "FTMUSDT", "JUPUSDT"
+    "MANAUSDT", "AXSUSDT", "FLOWUSDT", "EOSUSDT", "XTZUSDT", "KAVAUSDT", "FTMUSDT", "JUPUSDT",
+    "WLDUSDT", "NOTUSDT", "PYTHUSDT", "ENAUSDT", "TAOUSDT", "BONKUSDT", "FETUSDT", "WIFUSDT",
+    "ARKMUSDT", "CRVUSDT", "DYDXUSDT", "PENDLEUSDT", "STRKUSDT", "ZROUSDT"
 ]
 
-FREE_LIMIT = 2
-VIP_LIMIT = 12
+FREE_LIMIT = 4
+VIP_LIMIT = 15
 
 AUTO_INTERVAL_OPTIONS = {
     "10m": 600,
@@ -87,6 +91,7 @@ MESSAGES = {
             "👤 *Профіль*\n"
             "ID: `{id}`\n"
             "План: {vip}\n"
+            "VIP до: {vip_until}\n"
             "Auto: {auto}\n"
             "Інтервал: {interval}\n"
             "Мова: {lang}\n"
@@ -115,10 +120,14 @@ MESSAGES = {
             "• support / resistance / volatility\n"
             "• сильні сигнали та історія\n"
             "• AUTO Signals 10m / 15m / 30m / 1h / 2h / 4h\n"
+            "• weekly VIP за Stars\n"
             "• більше обраних і алерти\n\n"
-            f"Ціна: *{VIP_PRICE_USDT} USDT*"
+            f"Ціна місяць: *{VIP_PRICE_USDT} USDT*\n"
+            f"Тиждень через Stars: *{VIP_WEEK_STARS} ⭐*"
         ),
         "vip_created": "💳 Рахунок для VIP створено. Натисни кнопку нижче для оплати.",
+        "stars_invoice_sent": "⭐ Інвойс на тижневий VIP через Stars відправлено.",
+        "stars_week_activated": "⭐ VIP через Stars активовано на 7 днів.",
         "invoice_wait": "⌛ Оплату ще не підтверджено. Якщо вже оплатив, перевір ще раз через кілька секунд.",
         "invoice_expired": "⌛ Рахунок більше неактивний. Створи новий.",
         "invoice_error": "❌ Не вдалося створити рахунок. Перевір CryptoBot токен.",
@@ -186,6 +195,7 @@ MESSAGES = {
             "👤 *Profile*\n"
             "ID: `{id}`\n"
             "Plan: {vip}\n"
+            "VIP until: {vip_until}\n"
             "Auto: {auto}\n"
             "Interval: {interval}\n"
             "Language: {lang}\n"
@@ -214,10 +224,14 @@ MESSAGES = {
             "• support / resistance / volatility\n"
             "• stronger signals and history\n"
             "• AUTO Signals 10m / 15m / 30m / 1h / 2h / 4h\n"
+            "• weekly VIP via Stars\n"
             "• more favorites and alerts\n\n"
-            f"Price: *{VIP_PRICE_USDT} USDT*"
+            f"Monthly price: *{VIP_PRICE_USDT} USDT*\n"
+            f"Weekly via Stars: *{VIP_WEEK_STARS} ⭐*"
         ),
         "vip_created": "💳 VIP invoice created. Tap the button below to pay.",
+        "stars_invoice_sent": "⭐ Weekly VIP Stars invoice sent.",
+        "stars_week_activated": "⭐ VIP via Stars activated for 7 days.",
         "invoice_wait": "⌛ Payment is not confirmed yet. If you already paid, check again in a few seconds.",
         "invoice_expired": "⌛ Invoice is no longer active. Create a new one.",
         "invoice_error": "❌ Could not create invoice. Check the CryptoBot token.",
@@ -283,6 +297,7 @@ def get_user(uid):
     if uid not in users:
         users[uid] = {
             "vip": False,
+            "vip_until": 0,
             "favorites": [],
             "alerts": {},
             "last_coin": None,
@@ -299,6 +314,7 @@ def get_user(uid):
         save_users()
 
     user = users[uid]
+    user.setdefault("vip_until", 0)
     user.setdefault("favorites", [])
     user.setdefault("alerts", {})
     user.setdefault("last_coin", None)
@@ -320,7 +336,21 @@ def msg(uid, key, **kwargs):
 
 
 def user_is_vip(uid):
-    return get_user(uid).get("vip", False)
+    user = get_user(uid)
+    if user.get("vip", False):
+        return True
+    return user.get("vip_until", 0) > int(time.time())
+
+
+def format_vip_until(uid):
+    user = get_user(uid)
+    if user.get("vip", False):
+        return "`∞`"
+    vip_until = int(user.get("vip_until", 0) or 0)
+    if vip_until <= int(time.time()):
+        return "`-`"
+    days_left = max(1, int((vip_until - time.time()) // 86400) + 1)
+    return f"`{days_left} дн.`"
 
 
 def api_get_json(url, headers=None, timeout=10):
@@ -637,6 +667,7 @@ def vip_menu_inline(user):
         kb.add(InlineKeyboardButton("🆕 Створити новий рахунок", callback_data="buy_vip"))
     else:
         kb.add(InlineKeyboardButton("💎 Купити VIP", callback_data="buy_vip"))
+    kb.add(InlineKeyboardButton(f"⭐ VIP на 7 днів за {VIP_WEEK_STARS} Stars", callback_data="buy_vip_stars_week"))
     return kb
 
 
@@ -784,9 +815,15 @@ async def send_coin_analysis(uid, symbol, timeframe=None):
         await bot.send_message(uid, report, parse_mode="Markdown", reply_markup=markup)
 
 
-async def activate_vip(uid):
+async def activate_vip(uid, days=None):
     user = get_user(uid)
-    user["vip"] = True
+    if days is None:
+        user["vip"] = True
+        user["vip_until"] = 0
+    else:
+        current_until = int(user.get("vip_until", 0) or 0)
+        base = max(int(time.time()), current_until)
+        user["vip_until"] = base + days * 86400
     user["invoice_id"] = None
     user["invoice_url"] = None
     save_users()
@@ -914,9 +951,7 @@ async def vip_grant(message: types.Message):
         await message.answer("Використання: /vip_grant USER_ID")
         return
     uid = int(args[1])
-    target = get_user(uid)
-    target["vip"] = True
-    save_users()
+    await activate_vip(uid)
     await message.answer(msg(message.from_user.id, "vip_granted", uid=uid), parse_mode="Markdown")
 
 
@@ -932,6 +967,7 @@ async def vip_revoke(message: types.Message):
     uid = int(args[1])
     target = get_user(uid)
     target["vip"] = False
+    target["vip_until"] = 0
     target["auto"] = False
     save_users()
     await message.answer(msg(message.from_user.id, "vip_revoked", uid=uid), parse_mode="Markdown")
@@ -1076,7 +1112,8 @@ async def profile_cmd(message: types.Message):
         message.from_user.id,
         "profile",
         id=message.from_user.id,
-        vip="💎 VIP" if user["vip"] else "Free",
+        vip="💎 VIP" if user_is_vip(message.from_user.id) else "Free",
+        vip_until=format_vip_until(message.from_user.id),
         auto="✅" if user["auto"] else "❌",
         interval=interval_label(user["interval"]),
         lang=user["lang"].upper(),
@@ -1246,7 +1283,7 @@ async def history_cmd(message: types.Message):
 @dp.message_handler(lambda m: m.text == "💎 VIP")
 async def vip_info(message: types.Message):
     user = get_user(message.from_user.id)
-    if user["vip"]:
+    if user_is_vip(message.from_user.id):
         await message.answer(msg(message.from_user.id, "vip_already"))
         return
     await message.answer(msg(message.from_user.id, "vip_buy_info"), parse_mode="Markdown", reply_markup=vip_menu_inline(user))
@@ -1255,7 +1292,7 @@ async def vip_info(message: types.Message):
 @dp.callback_query_handler(lambda c: c.data == "buy_vip")
 async def buy_vip(callback: types.CallbackQuery):
     user = get_user(callback.from_user.id)
-    if user["vip"]:
+    if user_is_vip(callback.from_user.id):
         await callback.answer(msg(callback.from_user.id, "vip_already"), show_alert=True)
         return
     invoice = create_vip_invoice(callback.from_user.id)
@@ -1272,6 +1309,37 @@ async def buy_vip(callback: types.CallbackQuery):
         reply_markup=payment_inline(invoice["invoice_url"]),
     )
     await callback.answer("Рахунок створено")
+
+
+@dp.callback_query_handler(lambda c: c.data == "buy_vip_stars_week")
+async def buy_vip_stars_week(callback: types.CallbackQuery):
+    if user_is_vip(callback.from_user.id):
+        await callback.answer(msg(callback.from_user.id, "vip_already"), show_alert=True)
+        return
+    await bot.send_invoice(
+        callback.from_user.id,
+        title="VIP Week Access",
+        description="Weekly VIP access for Crypto AI Signal Bot",
+        provider_token="",
+        currency="XTR",
+        prices=[types.LabeledPrice(label="VIP Week", amount=VIP_WEEK_STARS)],
+        start_parameter="vip-stars-week",
+        payload=f"vip_week:{callback.from_user.id}",
+    )
+    await callback.answer(msg(callback.from_user.id, "stars_invoice_sent"))
+
+
+@dp.pre_checkout_query_handler(lambda q: True)
+async def pre_checkout_query(pre_checkout_q: types.PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_q.id, ok=True)
+
+
+@dp.message_handler(content_types=types.ContentTypes.SUCCESSFUL_PAYMENT)
+async def successful_payment(message: types.Message):
+    payment = message.successful_payment
+    if payment.currency == "XTR" and payment.invoice_payload.startswith("vip_week:"):
+        await activate_vip(message.from_user.id, days=7)
+        await message.answer(msg(message.from_user.id, "stars_week_activated"))
 
 
 @dp.callback_query_handler(lambda c: c.data == "check_vip_payment")
@@ -1306,7 +1374,7 @@ async def background_loop():
     while True:
         now = time.time()
         for uid, user in list(users.items()):
-            if user.get("invoice_id") and not user.get("vip"):
+            if user.get("invoice_id") and not user_is_vip(uid):
                 try:
                     invoice = get_invoice_status(user["invoice_id"])
                     if invoice and invoice.get("status") == "paid":
@@ -1326,7 +1394,7 @@ async def background_loop():
             for coin in alerts_to_remove:
                 user["alerts"].pop(coin, None)
 
-            if user.get("vip") and user.get("auto") and user.get("interval", 0) > 0:
+            if user_is_vip(uid) and user.get("auto") and user.get("interval", 0) > 0:
                 if now - user.get("last_signal", 0) >= user["interval"]:
                     favorites = user.get("favorites") or ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
                     for coin in favorites[:5]:
